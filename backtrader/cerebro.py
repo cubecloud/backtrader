@@ -264,11 +264,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         Set to ``False`` for compatibility. May be changed to ``True``
 
-
-      - ``bar_on_exit`` (default: ``True``)
-
-        When data is reaching its end then the currently in progress bar is still
-        delivered. The bar may be incomplete.
     '''
 
     params = (
@@ -291,7 +286,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('cheat_on_open', False),
         ('broker_coo', True),
         ('quicknotify', False),
-        ('bar_on_exit', True),
     )
 
     def __init__(self):
@@ -312,7 +306,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         self.storecbs = list()
         self.datacbs = list()
         self.signals = list()
-        self.listeners = list()
         self._signal_strat = (None, None, None)
         self._signal_concurrent = False
         self._signal_accumulate = False
@@ -339,7 +332,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         for elem in iterable:
             if isinstance(elem, string_types):
                 elem = (elem,)
-            elif not isinstance(elem, collections.abc.Iterable):
+            elif not isinstance(elem, collections.Iterable):
                 elem = (elem,)
 
             niterable.append(elem)
@@ -624,9 +617,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         self.writers.append((wrtcls, args, kwargs))
 
-    def addlistener(self, lstcls, *args, **kwargs):
-        self.listeners.append((lstcls, args, kwargs))
-
     def addsizer(self, sizercls, *args, **kwargs):
         '''Adds a ``Sizer`` class (and args) which is the default sizer for any
         strategy added to cerebro
@@ -679,7 +669,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(msg, *args, **kwargs)
+          - callback(msg, \*args, \*\*kwargs)
 
         The actual ``msg``, ``*args`` and ``**kwargs`` received are
         implementation defined (depend entirely on the *data/broker/store*) but
@@ -721,7 +711,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(data, status, *args, **kwargs)
+          - callback(data, status, \*args, \*\*kwargs)
 
         The actual ``*args`` and ``**kwargs`` received are implementation
         defined (depend entirely on the *data/broker/store*) but in general one
@@ -899,7 +889,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         def add_optcount(params):
             for p in params if isinstance(params, list) else params.values():
                 # not everything here might be iterable and count towards optcount (like e.g. bools)
-                if not isinstance(p, collections.abc.Iterable):
+                if not isinstance(p, collections.Iterable):
                     continue
                 self._optcount *= len(p)
 
@@ -1031,13 +1021,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         Used during optimization to prevent optimization result `runstrats`
         from being pickled to subprocesses
-        Also optcbs don't need to be transfered to subprocesses. They might fail to pickle due to use of e.g. tqdm
         '''
 
         rv = vars(self).copy()
         if 'runstrats' in rv:
             del(rv['runstrats'])
-            del(rv['optcbs'])
         return rv
 
     def runstop(self):
@@ -1097,7 +1085,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
             self._dopreload = False
 
         self.runwriters = list()
-        self.runlisteners = list()
 
         # Add the system default writer if requested
         if self.p.writer is True:
@@ -1108,10 +1095,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         for wrcls, wrargs, wrkwargs in self.writers:
             wr = wrcls(*wrargs, **wrkwargs)
             self.runwriters.append(wr)
-
-        for lstcls, lstargs, lstkwargs in self.listeners:
-            wr = lstcls(*lstargs, **lstkwargs)
-            self.runlisteners.append(wr)
 
         # Write down if any writer wants the full csv output
         self.writers_csv = any(map(lambda x: x.p.csv, self.runwriters))
@@ -1302,9 +1285,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
             for writer in self.runwriters:
                 writer.start()
 
-            for listener in self.runlisteners:
-                listener.start(self)
-
             # Prepare timers
             self._timers = []
             self._timerscheat = []
@@ -1352,9 +1332,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 for a in strat.analyzers:
                     a.strategy = None
                     a._parent = None
-                    a.optimize()
+                    for attrname in dir(a):
+                        if attrname.startswith('data'):
+                            setattr(a, attrname, None)
 
-                oreturn = OptReturn(strat.params, analyzers=strat.analyzers)#, strategycls=type(strat))
+                oreturn = OptReturn(strat.params, analyzers=strat.analyzers, strategycls=type(strat))
                 results.append(oreturn)
 
             return results
@@ -1380,9 +1362,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
         for writer in self.runwriters:
             writer.writedict(dict(Cerebro=cerebroinfo))
             writer.stop()
-
-        for listener in self.runlisteners:
-            listener.stop()
 
     def _brokernotify(self):
         '''
@@ -1517,13 +1496,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
                     writer.addvalues(wvalues)
 
                     writer.next()
-
-    def _next_listeners(self):
-        if not self.runlisteners:
-            return
-
-        for listener in self.runlisteners:
-            listener.next()
 
     def _disable_runonce(self):
         '''API for lineiterators to disable runonce (see HeikinAshi)'''
@@ -1663,7 +1635,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
             if self._event_stop:  # stop if requested
                 return
 
-            if d0ret or (lastret and self.params.bar_on_exit):  # bars produced by data or filters
+            if d0ret or lastret:  # bars produced by data or filters
                 self._check_timers(runstrats, dt0, cheat=False)
                 for strat in runstrats:
                     strat._next()
@@ -1671,8 +1643,6 @@ class Cerebro(with_metaclass(MetaParams, object)):
                         return
 
                     self._next_writers(runstrats)
-
-                self._next_listeners()
 
         # Last notification chance before stopping
         self._datanotify()
