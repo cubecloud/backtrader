@@ -142,19 +142,20 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
     def _checkbarover(self, data, fromcheck=False, forcedata=None):
         chkdata = DTFaker(data, forcedata) if fromcheck else data
 
-        isover = False
         if not self.componly and not self._barover(chkdata):
-            return isover
+            return False
 
         if self.subdays and self.p.bar2edge:
-            isover = True
+            return True
         elif not fromcheck:  # fromcheck doesn't increase compcount
             self.compcount += 1
             if not (self.compcount % self.p.compression):
                 # boundary crossed and enough bars for compression ... proceed
-                isover = True
-
-        return isover
+                return True
+            else:
+                return False
+        else:
+            return False
 
     def _barover(self, data):
         tframe = self.p.timeframe

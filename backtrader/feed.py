@@ -231,7 +231,6 @@ class AbstractDataBase(with_metaclass(MetaAbstractDataBase,
             # returns times in utc
             _, nexteos = self._calendar.schedule(dtime, self._tz)
             nextdteos = date2num(nexteos)  # nextos is already utc
-
         return nexteos, nextdteos
 
     def _gettzinput(self):
