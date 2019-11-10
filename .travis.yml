@@ -1,6 +1,8 @@
 dist: xenial
 language: python
 python:
+  - "3.4"
+  - "3.5"
   - "3.6"
   - "3.7"
   - "3.8"
@@ -10,13 +12,7 @@ python:
 
 matrix:
   allow_failures:
-    python: "3.8-dev"
     python: "nightly"
 
-# command to install dependencies
-# install:
-#  - pip install your_package
-#    pip install git+https://github.com/blampe/IbPy.git
-
 # command to run tests
-script: cd tests && nosetests -v -v
+script: python setup.py test

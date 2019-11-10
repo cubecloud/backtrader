@@ -161,7 +161,7 @@ class TradingCalendar(TradingCalendarBase):
 
             return day, isocal
 
-    def schedule(self, day, tz=None):
+    def schedule(self, ts, tz=None):
         '''
         Returns the opening and closing times for the given ``day``. If the
         method is called, the assumption is that ``day`` is an actual trading
@@ -169,27 +169,26 @@ class TradingCalendar(TradingCalendarBase):
 
         The return value is a tuple with 2 components: opentime, closetime
         '''
+        if ts.tzinfo is not None:
+            ts = ts.astimezone(UTC).replace(tzinfo=None)  # get naive UTC datetime
+
+        # go back 1 extra day to account for possible timezone drift
+        searchdate = (ts - 2 * ONEDAY).date()
         while True:
-            dt = day.date()
+            searchdate = self._nextday(searchdate)[0]
+            dt = ts.date()
             try:
                 i = self._earlydays.index(dt)
                 o, c = self.p.earlydays[i][1:]
             except ValueError:  # not found
                 o, c = self.p.open, self.p.close
 
-            closing = datetime.combine(dt, c)
-            if tz is not None:
-                closing = tz.localize(closing).astimezone(UTC)
-                closing = closing.replace(tzinfo=None)
+            closing = datetime.combine(searchdate, c)
 
-            if day > closing:  # current time over eos
-                day += ONEDAY
+            if ts >= closing:  # current time over eos
                 continue
 
-            opening = datetime.combine(dt, o)
-            if tz is not None:
-                opening = tz.localize(opening).astimezone(UTC)
-                opening = opening.replace(tzinfo=None)
+            opening = datetime.combine(searchdate, o)
 
             return opening, closing
 
