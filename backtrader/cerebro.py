@@ -264,6 +264,11 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         Set to ``False`` for compatibility. May be changed to ``True``
 
+
+      - ``bar_on_exit`` (default: ``True``)
+
+        When data is reaching its end then the currently in progress bar is still
+        delivered. The bar may be incomplete.
     '''
 
     params = (
@@ -286,6 +291,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         ('cheat_on_open', False),
         ('broker_coo', True),
         ('quicknotify', False),
+        ('bar_on_exit', True),
     )
 
     def __init__(self):
@@ -1635,7 +1641,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
             if self._event_stop:  # stop if requested
                 return
 
-            if d0ret or lastret:  # bars produced by data or filters
+            if d0ret or (lastret and self.params.bar_on_exit):  # bars produced by data or filters
                 self._check_timers(runstrats, dt0, cheat=False)
                 for strat in runstrats:
                     strat._next()

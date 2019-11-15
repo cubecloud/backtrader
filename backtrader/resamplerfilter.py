@@ -142,12 +142,25 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
     def _checkbarover(self, data, fromcheck=False, forcedata=None):
         chkdata = DTFaker(data, forcedata) if fromcheck else data
 
+        # scenarios:
+        # 1 Tick -> 5 Ticks     componly=t subdays=f
+        # 2 Ticks -> 5 Ticks    componly=f sbudays=f
+        # 1 Tick -> 1 Day       componly=f subdays=f
+        # 1 Tick -> 1 Minute    componly=f subdays=t
+        # 1 Minute -> 5 Minute  componly=f subdays=t
+
+        # if bar is not over only return False when also timeframe is changed
+        # componly also involves checking for odd compressions like 2 -> 5. is this relevant?
+        #
+        # componly can ONLY be true for timeframe Ticks and >= Days !!
         if not self.componly and not self._barover(chkdata):
             return False
 
+        # subdays: Ticks < (target-)timeframe < Days
+        # subdays handled compressions itself in _barover?
         if self.subdays and self.p.bar2edge:
             return True
-        elif not fromcheck:  # fromcheck doesn't increase compcount
+        elif not self.componly or not fromcheck:  # fromcheck doesn't increase compcount
             self.compcount += 1
             if not (self.compcount % self.p.compression):
                 # boundary crossed and enough bars for compression ... proceed
@@ -192,25 +205,25 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
         grter = data.datetime[0] > self._nextdteos
 
         if exact:
-            ret = equal
+            is_eos = equal
         else:
             # if the compared data goes over the endofsession
             # make sure the resampled bar is open and has something before that
             # end of session. It could be a weekend and nothing was delivered
             # until Monday
             if grter:
-                ret = (self.bar.isopen() and
-                       self.bar.datetime <= self._nextdteos)
+                is_eos = self.bar.isopen() and self.bar.datetime <= self._nextdteos
             else:
-                ret = equal
+                is_eos = equal
 
-        if ret:
+        if is_eos:
+            # we reached end of session, clear session so we fetch next eos
             self._lasteos = self._nexteos
             self._lastdteos = self._nextdteos
             self._nexteos = None
             self._nextdteos = float('-inf')
 
-        return ret
+        return is_eos
 
     def _barover_days(self, data):
         return self._eoscheck(data)
