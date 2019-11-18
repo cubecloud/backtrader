@@ -338,7 +338,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         for elem in iterable:
             if isinstance(elem, string_types):
                 elem = (elem,)
-            elif not isinstance(elem, collections.Iterable):
+            elif not isinstance(elem, collections.abc.Iterable):
                 elem = (elem,)
 
             niterable.append(elem)
@@ -675,7 +675,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(msg, \*args, \*\*kwargs)
+          - callback(msg, *args, **kwargs)
 
         The actual ``msg``, ``*args`` and ``**kwargs`` received are
         implementation defined (depend entirely on the *data/broker/store*) but
@@ -717,7 +717,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
 
         The signature of the callback must support the following:
 
-          - callback(data, status, \*args, \*\*kwargs)
+          - callback(data, status, *args, **kwargs)
 
         The actual ``*args`` and ``**kwargs`` received are implementation
         defined (depend entirely on the *data/broker/store*) but in general one
@@ -895,7 +895,7 @@ class Cerebro(with_metaclass(MetaParams, object)):
         def add_optcount(params):
             for p in params if isinstance(params, list) else params.values():
                 # not everything here might be iterable and count towards optcount (like e.g. bools)
-                if not isinstance(p, collections.Iterable):
+                if not isinstance(p, collections.abc.Iterable):
                     continue
                 self._optcount *= len(p)
 

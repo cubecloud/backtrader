@@ -119,6 +119,10 @@ setuptools.setup(
         'plotting':  ['matplotlib'],
     },
 
+    tests_require=['freezegun', 'nose', 'matplotlib'],
+    
+    test_suite = 'nose.collector',
+
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
