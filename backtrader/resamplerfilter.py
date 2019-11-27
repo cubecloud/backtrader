@@ -197,18 +197,12 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
             self._nexteos, self._nextdteos = self.data._getnexteos()
             return
 
-    def _eoscheck(self, data, seteos=True, exact=False):
+    def _eoscheck(self, data, seteos=True, exact=False, barovercond=False):
         if seteos:
             self._eosset()
 
-        # data can either be a datafeed or a float (dt) object
-        if isinstance(data, float):
-            dt = data
-        else:
-            dt = data.datetime[0]
-
-        equal = dt == self._nextdteos
-        grter = dt > self._nextdteos
+        equal = data.datetime[0] == self._nextdteos
+        grter = data.datetime[0] > self._nextdteos
 
         if exact:
             is_eos = equal
@@ -218,21 +212,18 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
             # end of session. It could be a weekend and nothing was delivered
             # until Monday
             if grter:
-                is_eos = self.bar.isopen() and self.bar.datetime <= self._nextdteos
+                is_eos = barovercond or (self.bar.isopen() and self.bar.datetime <= self._nextdteos)
             else:
                 is_eos = equal
 
+        if is_eos:
+            # we reached end of session, clear session so we fetch next eos
+            self._lasteos = self._nexteos
+            self._lastdteos = self._nextdteos
+            self._nexteos = None
+            self._nextdteos = float('-inf')
+
         return is_eos
-
-    def _eos_clear(self, dt):
-        if self._nexteos is None or not self._eoscheck(dt, seteos=False):
-            return
-
-        # we reached end of session, clear session so we fetch next eos
-        self._lasteos = self._nexteos
-        self._lastdteos = self._nextdteos
-        self._nexteos = None
-        self._nextdteos = float('-inf')
 
     def _barover_days(self, data):
         return self._eoscheck(data)
@@ -517,9 +508,6 @@ class Resampler(_BaseResampler):
 
     def __call__(self, data, fromcheck=False, forcedata=None):
         '''Called for each set of values produced by the data source'''
-        if len(data) > 1:
-            self._eos_clear(data.datetime[-1])
-
         consumed = False
         onedge = False
         docheckover = True
@@ -546,6 +534,7 @@ class Resampler(_BaseResampler):
 
         if consumed:
             self.bar.bupdate(data)  # update new or existing bar
+            self._eoscheck(data, barovercond=True)  # eoscheck was possibly skipped in dataonedge so lets give it a chance here
             data.backwards()  # remove used bar
 
         # if self.bar.isopen and (onedge or (docheckover and checkbarover))
@@ -639,9 +628,6 @@ class Replayer(_BaseResampler):
     replaying = True
 
     def __call__(self, data, fromcheck=False, forcedata=None):
-        if len(data) > 1:
-            self._eos_clear(data.datetime[-1])
-
         consumed = False
         onedge = False
         takinglate = False
@@ -669,6 +655,10 @@ class Replayer(_BaseResampler):
             self.bar.bupdate(data)
             if takinglate:
                 self.bar.datetime = data.datetime[-1] + 0.000001
+
+            # eoscheck was possibly skipped in dataonedge
+            # so lets give it a chance here
+            self._eoscheck(data)
 
         # if onedge or (checkbarover and self._checkbarover)
         cond = onedge
