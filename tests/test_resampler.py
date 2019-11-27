@@ -23,7 +23,6 @@ def _run_resampler(data_timeframe,
                    tick_interval=datetime.timedelta(seconds=25),
                    live=False,
                    backtest_number_of_bars=10,
-                   tickedgestart=False,
                    use_tcal=False,
                    open_hour=None,
                    open_minute=None,
@@ -35,7 +34,7 @@ def _run_resampler(data_timeframe,
     cerebro.addstrategy(bt.strategies.BarRecorderStrategy)
 
     if use_tcal:
-        tcal = bt.TradingCalendar(open=datetime.time(hour=open_hour), close=datetime.time(hour=close_hour, minute=close_minute))
+        tcal = bt.TradingCalendar(open=datetime.time(hour=open_hour, minute=open_minute), close=datetime.time(hour=close_hour, minute=close_minute))
         cerebro.addcalendar(tcal)
 
     data = bt.feeds.LiveFake(timeframe=data_timeframe,
@@ -47,7 +46,7 @@ def _run_resampler(data_timeframe,
                              backtest_number_of_bars=backtest_number_of_bars,
                              )
 
-    cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression, tickedgestart=tickedgestart)
+    cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
 
     # return the recorded bars attribute from the first strategy
     return cerebro.run()[0]
@@ -74,52 +73,6 @@ def test_ticks_to_m1_no_startedge():
     assert_bar(bars[2], datetime.datetime(2000, 1, 1, 0, 3), open=206, close=208)
     assert_bar(bars[3], datetime.datetime(2000, 1, 1, 0, 4), open=209, close=211)
 
-
-@freeze_time("Jan 1th, 2000", tick=True)
-def test_ticks_to_m1_w_startedge():
-    """Backtest ticks resampled to M1 bars using tickedgestart=True. Tick on edge should be open for next bar."""
-    strat = _run_resampler(bt.TimeFrame.Ticks,
-                           1,
-                           resample_timeframe=bt.TimeFrame.Minutes,
-                           resample_compression=1,
-                           tick_interval=datetime.timedelta(seconds=20),
-                           live=False,
-                           backtest_number_of_bars=13,
-                           tickedgestart=True,
-                           )
-
-    bars = strat.bars
-
-    assert len(bars) == 4
-
-    assert_bar(bars[0], datetime.datetime(2000, 1, 1, 0, 1), open=200, close=201)
-    assert_bar(bars[1], datetime.datetime(2000, 1, 1, 0, 2), open=202, close=204)
-    assert_bar(bars[2], datetime.datetime(2000, 1, 1, 0, 3), open=205, close=207)
-    assert_bar(bars[3], datetime.datetime(2000, 1, 1, 0, 4), open=208, close=210)
-
-
-@freeze_time("Jan 1th, 2000", tick=True)
-def test_ticks_to_h1_w_startedge():
-    """Backtest ticks resampled to H1 bars using tickedgestart=True. Tick on edge should be open for next bar."""
-    strat = _run_resampler(bt.TimeFrame.Ticks,
-                           1,
-                           resample_timeframe=bt.TimeFrame.Minutes,
-                           resample_compression=60,
-                           tick_interval=datetime.timedelta(seconds=30),
-                           live=False,
-                           backtest_number_of_bars=370,
-                           tickedgestart=True,
-                           )
-
-    bars = strat.bars
-
-    assert len(bars) == 3
-
-    assert_bar(bars[0], datetime.datetime(2000, 1, 1, 1, 0), open=200, close=318)
-    assert_bar(bars[1], datetime.datetime(2000, 1, 1, 2, 0), open=319, close=438)
-    assert_bar(bars[2], datetime.datetime(2000, 1, 1, 3, 0), open=439, close=558)
-
-
 @freeze_time("Jan 1th, 2000", tick=True)
 def test_ticks_to_d1_no_tcal():
     strat = _run_resampler(bt.TimeFrame.Ticks, 1,
@@ -127,7 +80,6 @@ def test_ticks_to_d1_no_tcal():
                            tick_interval=datetime.timedelta(seconds=3600),
                            live=False,
                            backtest_number_of_bars=600,
-                           tickedgestart=False,
                            )
     bars = strat.bars
 
@@ -147,9 +99,9 @@ def test_ticks_to_d1_tcal_8_to_20_2015():
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
                            backtest_number_of_bars=600,
-                           tickedgestart=False,
                            use_tcal=True,
                            open_hour=8,
+                           open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
@@ -168,9 +120,9 @@ def test_ticks_to_d1_tcal_8_to_20_2000():
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
                            backtest_number_of_bars=600,
-                           tickedgestart=False,
                            use_tcal=True,
                            open_hour=8,
+                           open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
@@ -187,9 +139,9 @@ def test_ticks_to_d1_tcal_8_to_20_30_2015():
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
                            backtest_number_of_bars=600,
-                           tickedgestart=False,
                            use_tcal=True,
                            open_hour=8,
+                           open_minute=0,
                            close_hour=20,
                            close_minute=30,
                            )
@@ -201,35 +153,15 @@ def test_ticks_to_d1_tcal_8_to_20_30_2015():
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
-def test_ticks_to_d1_tcal_8_to_20_startedge():
-    strat = _run_resampler(bt.TimeFrame.Ticks, 1,
-                           resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
-                           tick_interval=datetime.timedelta(seconds=600),
-                           live=False,
-                           backtest_number_of_bars=600,
-                           tickedgestart=True,
-                           use_tcal=True,
-                           open_hour=8,
-                           close_hour=20,
-                           close_minute=0,
-                           )
-    bars = strat.bars
-    assert len(bars) == 2
-
-    assert_bar(bars[0], datetime.datetime(2015, 1, 1, 20, 0, 0), open=200, close=318)
-    assert_bar(bars[1], datetime.datetime(2015, 1, 2, 20, 0, 0), open=319, close=462)
-
-
-@freeze_time("Jan 1th, 2015", tick=True)
 def test_ticks_to_d1_tcal_8_to_20():
     strat = _run_resampler(bt.TimeFrame.Ticks, 1,
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
                            backtest_number_of_bars=600,
-                           tickedgestart=False,
                            use_tcal=True,
                            open_hour=8,
+                           open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
@@ -247,7 +179,6 @@ def test_h1_to_h1_tcal_9_to_18():
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
                            backtest_number_of_bars=30,
-                           tickedgestart=False,
                            use_tcal=True,
                            open_hour=9,
                            open_minute=0,
@@ -270,8 +201,7 @@ def test_h1_to_h1_tcal_9_to_17_35():
                            resample_timeframe=bt.TimeFrame.Minutes, resample_compression=60,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
-                           backtest_number_of_bars=30,
-                           tickedgestart=False,
+                           backtest_number_of_bars=60,
                            use_tcal=True,
                            open_hour=9,
                            open_minute=0,
@@ -279,10 +209,9 @@ def test_h1_to_h1_tcal_9_to_17_35():
                            close_minute=35,
                            )
     bars = strat.bars
-
-    assert len(bars) == 30
+    assert len(bars) == 60
 
     assert_bar(bars[17], datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
     assert_bar(bars[27], datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
 
-    assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 1, 17, 35))
+    assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 5, 17, 35))
