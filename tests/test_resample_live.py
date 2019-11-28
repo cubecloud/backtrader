@@ -112,7 +112,7 @@ def test_live_ticks_to_m3_eos_rt():
     bars = strat.bars
     assert (len(bars) == 1)
 
-    assert_bar(bars[0], datetime.datetime(2000, 1, 2), open=200, close=203)
+    assert_bar(bars[0], datetime.datetime(2000, 1, 1, 23, 59, 59, 999989), open=200, close=203)
 
 
 @freeze_time("Jan 1th, 2000", tick=True)
@@ -136,12 +136,12 @@ def test_live_m1_to_m3_ff():
 def test_live_d1_to_d3_ff():
     """This is testing the componly path in Resampler."""
     strat = _run_resampler(live=False,
-                        backtest_number_of_bars=10,
-                        data_timeframe=bt.TimeFrame.Days,
-                        data_compression=1,
-                        resample_timeframe=bt.TimeFrame.Days,
-                        resample_compression=3,
-                        )
+                           backtest_number_of_bars=10,
+                           data_timeframe=bt.TimeFrame.Days,
+                           data_compression=1,
+                           resample_timeframe=bt.TimeFrame.Days,
+                           resample_compression=3,
+                           )
 
     bars = strat.bars
     assert (len(bars) == 3)

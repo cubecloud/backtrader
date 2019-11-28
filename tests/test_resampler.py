@@ -178,7 +178,7 @@ def test_h1_to_h1_tcal_9_to_18():
                            resample_timeframe=bt.TimeFrame.Minutes, resample_compression=60,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
-                           backtest_number_of_bars=30,
+                           backtest_number_of_bars=60,
                            use_tcal=True,
                            open_hour=9,
                            open_minute=0,
@@ -187,12 +187,12 @@ def test_h1_to_h1_tcal_9_to_18():
                            )
     bars = strat.bars
 
-    assert len(bars) == 30
+    assert len(bars) == 60
 
     assert_bar(bars[17], datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
     assert_bar(bars[27], datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
 
-    assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 2, 18))
+    assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 5, 18))
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
