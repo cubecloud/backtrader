@@ -534,7 +534,8 @@ class Resampler(_BaseResampler):
 
         if consumed:
             self.bar.bupdate(data)  # update new or existing bar
-            self._eoscheck(data, barovercond=True)  # eoscheck was possibly skipped in dataonedge so lets give it a chance here
+            if not self.componly:
+                self._eoscheck(data, barovercond=True)  # eoscheck was possibly skipped in dataonedge so lets give it a chance here
             data.backwards()  # remove used bar
 
         # if self.bar.isopen and (onedge or (docheckover and checkbarover))
