@@ -168,27 +168,41 @@ class TradingCalendar(TradingCalendarBase):
         day
 
         The return value is a tuple with 2 components: opentime, closetime
+
+        Input datetime is either a naive datetime object or a aware datetime.
+
+        Return values are UTC-based naive datetime objects.
+
+        ts is meant to be an aware datetime while tz is the timezone of opening/closing times.
         '''
         if ts.tzinfo is not None:
-            ts = ts.astimezone(UTC).replace(tzinfo=None)  # get naive UTC datetime
+            raise RuntimeError('Parameter ts is an aware datetime object but is expected to be naive!')
+
+        def tzshift(dt):
+            if tz is None:
+                return dt
+            return tz.localize(dt).astimezone(UTC).replace(tzinfo=None)
+
+        ts = tzshift(ts)
 
         # go back 1 extra day to account for possible timezone drift
         searchdate = (ts - 2 * ONEDAY).date()
         while True:
             searchdate = self._nextday(searchdate)[0]
-            dt = ts.date()
             try:
-                i = self._earlydays.index(dt)
+                i = self._earlydays.index(searchdate)
                 o, c = self.p.earlydays[i][1:]
             except ValueError:  # not found
                 o, c = self.p.open, self.p.close
 
             closing = datetime.combine(searchdate, c)
+            closing = tzshift(closing)
 
             if ts >= closing:  # current time over eos
                 continue
 
             opening = datetime.combine(searchdate, o)
+            opening = tzshift(opening)
 
             return opening, closing
 
