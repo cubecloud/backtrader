@@ -115,9 +115,12 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
                          data._timeframe == self.p.timeframe and
                          not (self.p.compression % data._compression))
 
-        self.bar = _Bar(maxdate=True)  # bar holder
-        self.compcount = 0  # count of produced bars to control compression
-        self._firstbar = True
+        # initialize state
+        self.bar = None  # bar holder
+        self.compcount = None  # count of produced bars to control compression
+        self._firstbar = None
+        self.reset()
+
         self.doadjusttime = (self.p.bar2edge and self.p.adjbartime and
                              self.subweeks)
 
@@ -130,6 +133,12 @@ class _BaseResampler(with_metaclass(metabase.MetaParams, object)):
         data._compression = self.p.compression
 
         self.data = data
+
+    def reset(self):
+        self.bar = _Bar(maxdate=True)
+        self.compcount = 0
+        self._firstbar = True
+        self._nexteos = None
 
     def _latedata(self, data):
         # new data at position 0, still untouched from stream
