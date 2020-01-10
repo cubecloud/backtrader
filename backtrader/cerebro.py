@@ -1027,11 +1027,13 @@ class Cerebro(with_metaclass(MetaParams, object)):
         '''
         Used during optimization to prevent optimization result `runstrats`
         from being pickled to subprocesses
+        Also optcbs don't need to be transfered to subprocesses. They might fail to pickle due to use of e.g. tqdm
         '''
 
         rv = vars(self).copy()
         if 'runstrats' in rv:
             del(rv['runstrats'])
+            del(rv['optcbs'])
         return rv
 
     def runstop(self):
