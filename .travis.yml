@@ -5,12 +5,13 @@ services:
 python:
   - "3.6"
   - "3.7"
-  - "3.8"
-  - "nightly"
+  - "3.8" 
+# - "nightly"
 
 matrix:
   allow_failures:
     python: "nightly"
 
-# command to run tests
-script: python setup.py test
+install: pip install tox-travis
+
+script: tox
