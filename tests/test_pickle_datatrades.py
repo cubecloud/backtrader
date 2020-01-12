@@ -4,10 +4,11 @@ import datetime
 import backtrader as bt
 
 import pickle
-import pytest
+
+from testcommon import getdatadir
 
 
-class TestStrategy(bt.Strategy):
+class BtTestStrategy(bt.Strategy):
     params = (
         ('period', 15),
         ('printdata', True),
@@ -20,10 +21,10 @@ def test_pickle_datatrades():
 
     cerebro.addobserver(bt.observers.DataTrades)
 
-    cerebro.addstrategy(TestStrategy, period=5)
+    cerebro.addstrategy(BtTestStrategy, period=5)
 
     data = bt.feeds.YahooFinanceCSVData(
-        dataname=r"..\datas\nvda-1999-2014.txt",
+        dataname=getdatadir("nvda-1999-2014.txt"),
         fromdate=datetime.datetime(2000, 1, 1),
         todate=datetime.datetime(2002, 12, 31),
         reverse=False,

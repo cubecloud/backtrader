@@ -5,7 +5,7 @@ import pytest
 import testcommon
 
 
-class TestStrategy(bt.Strategy):
+class BtTestStrategy(bt.Strategy):
     params = (
         ('period', 15),
         ('printdata', True),
@@ -33,7 +33,7 @@ def test_optsample(main=False):
 
     cerebro.resampledata(data, timeframe=bt.TimeFrame.Days, compression=2)
 
-    cerebro.optstrategy(TestStrategy, period=[5, 4])
+    cerebro.optstrategy(BtTestStrategy, period=[5, 4])
 
     result = cerebro.run()
 
