@@ -1340,11 +1340,9 @@ class Cerebro(with_metaclass(MetaParams, object)):
                 for a in strat.analyzers:
                     a.strategy = None
                     a._parent = None
-                    for attrname in dir(a):
-                        if attrname.startswith('data'):
-                            setattr(a, attrname, None)
+                    a.optimize()
 
-                oreturn = OptReturn(strat.params, analyzers=strat.analyzers, strategycls=type(strat))
+                oreturn = OptReturn(strat.params, analyzers=strat.analyzers)#, strategycls=type(strat))
                 results.append(oreturn)
 
             return results
