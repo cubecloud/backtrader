@@ -8,7 +8,7 @@ from backtrader.utils.py3 import ( with_metaclass)
 
 
 class ListenerBase(with_metaclass(bt.MetaParams, object)):
-    def next():
+    def next(self, doc=None):
         pass
 
     def start(self, cerebro):
