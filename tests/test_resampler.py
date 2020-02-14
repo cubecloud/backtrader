@@ -6,9 +6,9 @@ import time
 
 from testcommon import getdatadir
 import backtrader as bt
-from backtrader.strategies.bar_recorder import assert_bar
 import logging
 from freezegun import freeze_time
+from util_asserts import assert_data
 
 
 _logger = logging.getLogger(__name__)
@@ -18,11 +18,11 @@ def _run_resampler(data_timeframe,
                    data_compression,
                    resample_timeframe,
                    resample_compression,
+                   num_gen_bars,
                    runtime_seconds=27,
                    starting_value=200,
                    tick_interval=datetime.timedelta(seconds=25),
                    live=False,
-                   backtest_number_of_bars=10,
                    use_tcal=False,
                    open_hour=None,
                    open_minute=None,
@@ -31,19 +31,19 @@ def _run_resampler(data_timeframe,
                    ) -> bt.Strategy:
     _logger.info( "Constructing Cerebro")
     cerebro = bt.Cerebro(bar_on_exit=False)
-    cerebro.addstrategy(bt.strategies.BarRecorderStrategy)
+    cerebro.addstrategy(bt.strategies.NullStrategy)
 
     if use_tcal:
         tcal = bt.TradingCalendar(open=datetime.time(hour=open_hour, minute=open_minute), close=datetime.time(hour=close_hour, minute=close_minute))
         cerebro.addcalendar(tcal)
 
-    data = bt.feeds.LiveFake(timeframe=data_timeframe,
+    data = bt.feeds.FakeFeed(timeframe=data_timeframe,
                              compression=data_compression,
                              run_duration=datetime.timedelta(seconds=runtime_seconds),
                              starting_value=starting_value,
                              tick_interval=tick_interval,
                              live=live,
-                             backtest_number_of_bars=backtest_number_of_bars,
+                             num_gen_bars=num_gen_bars,
                              )
 
     cerebro.resampledata(data, timeframe=resample_timeframe, compression=resample_compression)
@@ -61,17 +61,16 @@ def test_ticks_to_m1_no_startedge():
                            resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=20),
                            live=False,
-                           backtest_number_of_bars=12
+                           num_gen_bars=12
                            )
 
-    bars = strat.bars
+    assert len(strat) == 4
 
-    assert len(bars) == 4
+    assert_data(strat.data, -3, datetime.datetime(2000, 1, 1, 0, 1), open=200, close=202)
+    assert_data(strat.data, -2, datetime.datetime(2000, 1, 1, 0, 2), open=203, close=205)
+    assert_data(strat.data, -1, datetime.datetime(2000, 1, 1, 0, 3), open=206, close=208)
+    assert_data(strat.data, 0, datetime.datetime(2000, 1, 1, 0, 4), open=209, close=211)
 
-    assert_bar(bars[0], datetime.datetime(2000, 1, 1, 0, 1), open=200, close=202)
-    assert_bar(bars[1], datetime.datetime(2000, 1, 1, 0, 2), open=203, close=205)
-    assert_bar(bars[2], datetime.datetime(2000, 1, 1, 0, 3), open=206, close=208)
-    assert_bar(bars[3], datetime.datetime(2000, 1, 1, 0, 4), open=209, close=211)
 
 @freeze_time("Jan 1th, 2000", tick=True)
 def test_ticks_to_d1_no_tcal():
@@ -79,17 +78,16 @@ def test_ticks_to_d1_no_tcal():
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=3600),
                            live=False,
-                           backtest_number_of_bars=600,
+                           num_gen_bars=600,
                            )
-    bars = strat.bars
 
-    assert len(bars) == 25
+    assert len(strat) == 25
 
-    assert_bar(bars[0], datetime.datetime(2000, 1,  1, 23, 59, 59, 999989), open=200, close=222)
-    assert_bar(bars[1], datetime.datetime(2000, 1,  2, 23, 59, 59, 999989), open=223, close=246)
-    assert_bar(bars[2], datetime.datetime(2000, 1,  3, 23, 59, 59, 999989), open=247, close=270)
-    assert_bar(bars[3], datetime.datetime(2000, 1,  4, 23, 59, 59, 999989), open=271, close=294)
-    assert_bar(bars[24], datetime.datetime(2000, 1,  25, 23, 59, 59, 999989), open=775, close=798)
+    assert_data(strat.data, -25, datetime.datetime(2000, 1,  1, 23, 59, 59, 999989), open=200, close=222)
+    assert_data(strat.data, -24, datetime.datetime(2000, 1,  2, 23, 59, 59, 999989), open=223, close=246)
+    assert_data(strat.data, -23, datetime.datetime(2000, 1,  3, 23, 59, 59, 999989), open=247, close=270)
+    assert_data(strat.data, -22, datetime.datetime(2000, 1,  4, 23, 59, 59, 999989), open=271, close=294)
+    assert_data(strat.data, -1, datetime.datetime(2000, 1,  25, 23, 59, 59, 999989), open=775, close=798)
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
@@ -98,18 +96,17 @@ def test_ticks_to_d1_tcal_8_to_20_2015():
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
-                           backtest_number_of_bars=600,
+                           num_gen_bars=600,
                            use_tcal=True,
                            open_hour=8,
                            open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
-    bars = strat.bars
-    assert len(bars) == 2
+    assert len(strat) == 2
 
-    assert_bar(bars[0], datetime.datetime(2015, 1, 1, 20, 0, 0), open=200, close=332)
-    assert_bar(bars[1], datetime.datetime(2015, 1, 2, 20, 0, 0), open=333, close=492)
+    assert_data(strat.data, -2, datetime.datetime(2015, 1, 1, 20, 0, 0), open=200, close=332)
+    assert_data(strat.data, -1, datetime.datetime(2015, 1, 2, 20, 0, 0), open=333, close=492)
 
 
 @freeze_time("Jan 1th, 2000", tick=True)
@@ -119,17 +116,17 @@ def test_ticks_to_d1_tcal_8_to_20_2000():
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
-                           backtest_number_of_bars=600,
+                           num_gen_bars=600,
                            use_tcal=True,
                            open_hour=8,
                            open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
-    bars = strat.bars
-    assert len(bars) == 1
 
-    assert_bar(bars[0], datetime.datetime(2000, 1, 3, 20, 0, 0), open=200, close=652)
+    assert len(strat) == 1
+
+    assert_data(strat.data, -1, datetime.datetime(2000, 1, 3, 20, 0, 0), open=200, close=652)
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
@@ -138,18 +135,18 @@ def test_ticks_to_d1_tcal_8_to_20_30_2015():
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=540),
                            live=False,
-                           backtest_number_of_bars=600,
+                           num_gen_bars=600,
                            use_tcal=True,
                            open_hour=8,
                            open_minute=0,
                            close_hour=20,
                            close_minute=30,
                            )
-    bars = strat.bars
-    assert len(bars) == 2
 
-    assert_bar(bars[0], datetime.datetime(2015, 1, 1, 20, 30, 0), open=200, close=335)
-    assert_bar(bars[1], datetime.datetime(2015, 1, 2, 20, 30, 0), open=336, close=495)
+    assert len(strat) == 2
+
+    assert_data(strat.data, -2, datetime.datetime(2015, 1, 1, 20, 30, 0), open=200, close=335)
+    assert_data(strat.data, -1, datetime.datetime(2015, 1, 2, 20, 30, 0), open=336, close=495)
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
@@ -158,18 +155,18 @@ def test_ticks_to_d1_tcal_8_to_20():
                            resample_timeframe=bt.TimeFrame.Days, resample_compression=1,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
-                           backtest_number_of_bars=600,
+                           num_gen_bars=600,
                            use_tcal=True,
                            open_hour=8,
                            open_minute=0,
                            close_hour=20,
                            close_minute=0,
                            )
-    bars = strat.bars
-    assert len(bars) == 2
 
-    assert_bar(bars[0], datetime.datetime(2015, 1, 1, 20, 0, 0), open=200, close=319)
-    assert_bar(bars[1], datetime.datetime(2015, 1, 2, 20, 0, 0), open=320, close=463)
+    assert len(strat) == 2
+
+    assert_data(strat.data, -2, datetime.datetime(2015, 1, 1, 20, 0, 0), open=200, close=319)
+    assert_data(strat.data, -1, datetime.datetime(2015, 1, 2, 20, 0, 0), open=320, close=463)
 
 
 @freeze_time("Jan 1th, 2015", tick=True)
@@ -178,19 +175,18 @@ def test_h1_to_h1_tcal_9_to_18():
                            resample_timeframe=bt.TimeFrame.Minutes, resample_compression=60,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
-                           backtest_number_of_bars=60,
+                           num_gen_bars=60,
                            use_tcal=True,
                            open_hour=9,
                            open_minute=0,
                            close_hour=18,
                            close_minute=0,
                            )
-    bars = strat.bars
 
-    assert len(bars) == 60
+    assert len(strat) == 60
 
-    assert_bar(bars[17], datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
-    assert_bar(bars[27], datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
+    assert_data(strat.data, -42, datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
+    assert_data(strat.data, -32, datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
 
     assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 5, 18))
 
@@ -201,17 +197,17 @@ def test_h1_to_h1_tcal_9_to_17_35():
                            resample_timeframe=bt.TimeFrame.Minutes, resample_compression=60,
                            tick_interval=datetime.timedelta(seconds=600),
                            live=False,
-                           backtest_number_of_bars=60,
+                           num_gen_bars=60,
                            use_tcal=True,
                            open_hour=9,
                            open_minute=0,
                            close_hour=17,
                            close_minute=35,
                            )
-    bars = strat.bars
-    assert len(bars) == 60
 
-    assert_bar(bars[17], datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
-    assert_bar(bars[27], datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
+    assert len(strat) == 60
+
+    assert_data(strat.data, -42, datetime.datetime(2015, 1, 1, 18, 0, 0), open=217, close=217)
+    assert_data(strat.data, -32, datetime.datetime(2015, 1, 2,  4, 0, 0), open=227, close=227)
 
     assert(strat.data._filters[0][0]._nexteos == datetime.datetime(2015, 1, 5, 17, 35))

@@ -52,4 +52,4 @@ from .vchartfile import VChartFile
 
 from .rollover import RollOver
 from .chainer import Chainer
-from .livefake import LiveFake
+from .fakefeed import FakeFeed

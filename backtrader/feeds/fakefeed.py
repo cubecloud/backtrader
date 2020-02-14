@@ -3,25 +3,30 @@ import logging
 import time
 
 import backtrader as bt
-
+from enum import Enum
 
 _logger = logging.getLogger(__name__)
 
 
-class LiveFake(bt.DataBase):
+class FakeFeed(bt.DataBase):
+    class State(Enum):
+        BACKTEST = 0,
+        BACKFILL = 1,
+        LIVE = 2,
+
     params = (
         ('starting_value', 200),
         ('tick_interval', datetime.timedelta(seconds=25)),
-        ('run_duration', datetime.timedelta(seconds=30)),  # only used when not fastforward
+        ('start_delay', 0),
+        ('run_duration', datetime.timedelta(seconds=30)),  # only used when not backtest mode
+        ('num_gen_bars', 10),  # number of bars to generate in backtest or backfill mode
+        ('use_orig_timeframe', True),
         ('live', True),
-        ('backtest_number_of_bars', 10),
-        ('use_orig_timeframe', True)
     )
 
     def __init__(self):
-        super(LiveFake, self).__init__()
+        super(FakeFeed, self).__init__()
 
-        self._starttime = None
         self._last_delivered = None
 
         self._cur_value = None
@@ -29,22 +34,23 @@ class LiveFake(bt.DataBase):
         self._num_bars_delivered = 0
         self._timeframe_in_effect = None
         self._compression_in_effect = None
-        self._tmoffset = datetime.timedelta(seconds=-0.5)  # configure offset cause we are senting slightly delayed ticked data (of course!)
+        self._backfill_curtime = None
+        self._tmoffset = datetime.timedelta(seconds=-0.5)  # configure offset cause we are sending slightly delayed ticked data (of course!)
+        self._start_ts = None  # time of the first call to _load to obey start_delay
 
     def start(self):
-        super(LiveFake, self).start()
+        super(FakeFeed, self).start()
 
-        self._starttime = datetime.datetime.utcnow()
+        self._start_ts = datetime.datetime.now()
         self._cur_value = self.p.starting_value
         self._timeframe_in_effect = self.p.timeframe if self.p.use_orig_timeframe else self._timeframe
         self._compression_in_effect = self.p.compression if self.p.use_orig_timeframe else self._compression
 
-    @staticmethod
-    def islive():
-        return True
+    def islive(self):
+        return self.p.live
 
     def _update_line(self, dt, value):
-        _logger.info(f"Updating line - Bar Time: {dt} - Value: {value}")
+        _logger.info(f"{self._name} - Updating line - Bar Time: {dt} - Value: {value}")
 
         #if dt.hour == 18:
         #    dt = dt.replace(hour=17, minute=35)
@@ -61,19 +67,47 @@ class LiveFake(bt.DataBase):
         self.lines.openinterest[0] = 0.0
 
     def _load(self):
-        if self.p.live:
-            return self._load_live()
-        else:
-            return self._load_backtest()
-
-    def _load_backtest(self):
-        if self._last_delivered is None:
-            self._set_starttime(datetime.datetime.utcnow())
+        now = datetime.datetime.now()
+        if now - self._start_ts < datetime.timedelta(seconds=self.p.start_delay):
             return None
 
-        if self._num_bars_delivered == self.p.backtest_number_of_bars:
-            return False
+        bars_done = self._num_bars_delivered >= self.p.num_gen_bars
 
+        if self.p.live:
+            if now - self._start_ts > self.p.run_duration:
+                return False
+        else:
+            if bars_done:
+                return False
+
+        if self.p.live:
+            if bars_done:
+                return self._load_live(now)
+            else:
+                return self._load_bar(now, True)
+        else:
+            return self._load_bar(now)
+
+    # def _load_bar(self):
+    #     if self._last_delivered is None:
+    #         self._last_delivered = self._starttime = datetime.datetime.utcnow()
+    #         return None
+    #
+    #     if self._timeframe_in_effect == bt.TimeFrame.Ticks:
+    #         delta = self.p.tick_interval * self._compression_in_effect
+    #     elif self._timeframe_in_effect == bt.TimeFrame.Minutes:
+    #         delta = datetime.timedelta(minutes=self._compression_in_effect)
+    #     elif self._timeframe_in_effect == bt.TimeFrame.Days:
+    #         delta = datetime.timedelta(days=self._compression_in_effect)
+    #     else:
+    #         raise RuntimeError(f"{self._name} - Unsupported timeframe: {self.p.timeframe}")
+    #
+    #     self._last_delivered += delta
+    #     self._update_line(self._last_delivered, self._cur_value)
+    #     self._cur_value += 1
+    #     self._num_bars_delivered += 1
+
+    def _load_bar(self, now, backfill=False):
         if self._timeframe_in_effect == bt.TimeFrame.Ticks:
             delta = self.p.tick_interval * self._compression_in_effect
         elif self._timeframe_in_effect == bt.TimeFrame.Minutes:
@@ -81,32 +115,34 @@ class LiveFake(bt.DataBase):
         elif self._timeframe_in_effect == bt.TimeFrame.Days:
             delta = datetime.timedelta(days=self._compression_in_effect)
         else:
-            raise RuntimeError(f"Unsupported timeframe: {self.p.timeframe}")
+            raise RuntimeError(f"{self._name} - Unsupported timeframe: {self.p.timeframe}")
+
+        if self._last_delivered is None:
+            if backfill:
+                self._last_delivered = self._time_floored(now - delta * (self.p.num_gen_bars - 1))
+            else:
+                self._last_delivered = self._time_floored(now)
 
         self._last_delivered += delta
+
+        _logger.info(f"{self._name} - Loading bar: {self._backfill_curtime}")
         self._update_line(self._last_delivered, self._cur_value)
         self._cur_value += 1
         self._num_bars_delivered += 1
         return True
 
-    def _set_starttime(self, now):
+    def _time_floored(self, now):
         t = now
         if self._timeframe_in_effect in [bt.TimeFrame.Minutes, bt.TimeFrame.Ticks]:
             t = t.replace(second=0, microsecond=0)
         elif self._timeframe_in_effect == bt.TimeFrame.Days:
             t = t.replace(minute=0, second=0, microsecond=0)
-        self._last_delivered = self._starttime = t
+        return t
 
-    def _load_live(self):
-        now = datetime.datetime.utcnow()
-
+    def _load_live(self, now):
         if self._last_delivered is None:
             # first run, fill last_delivered
-            self._set_starttime(now)
-            return None
-
-        if now - self._starttime > self.p.run_duration:
-            return False
+            self._last_delivered = self._time_floored(now)
 
         if self._timeframe_in_effect == bt.TimeFrame.Ticks:
             if now - self._last_delivered < self.p.tick_interval:
@@ -129,6 +165,7 @@ class LiveFake(bt.DataBase):
 
             self._update_line(self._last_delivered, self._cur_value)
             self._cur_value += 1
+            _logger.info(f"{self._name} - Tick delivered: {self._last_delivered}")
             return True
         else:
             return None

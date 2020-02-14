@@ -7,9 +7,9 @@ import datetime
 
 from testcommon import getdatadir
 import backtrader as bt
-from backtrader.strategies.bar_recorder import assert_bar
 import pytest
 import pytz
+from util_asserts import assert_data
 
 
 def _get_trading_calendar(open_hour, close_hour, close_minute):
@@ -19,7 +19,7 @@ def _get_trading_calendar(open_hour, close_hour, close_minute):
 
 def _run_cerebro(use_tcal, open_hour=None, open_minute=None, close_hour=None, close_minute=None):
     cerebro = bt.Cerebro()
-    cerebro.addstrategy(bt.strategies.BarRecorderStrategy)
+    cerebro.addstrategy(bt.strategies.NullStrategy)
 
     if use_tcal:
         cerebro.addcalendar(_get_trading_calendar(open_hour=open_hour,
@@ -34,50 +34,50 @@ def _run_cerebro(use_tcal, open_hour=None, open_minute=None, close_hour=None, cl
 
     cerebro.resampledata(data, timeframe=bt.TimeFrame.Days, compression=1)
 
-    return cerebro.run()[0].bars
+    return cerebro.run()[0]
 
 
 def test_no_tcal():
-    bars = _run_cerebro(use_tcal=False)
+    strat = _run_cerebro(use_tcal=False)
 
-    assert len(bars) == 4
+    assert len(strat) == 4
 
-    assert_bar(bars[0], datetime.datetime(2015, 9, 23, 23, 59, 59, 999989), close=3072)
-    assert_bar(bars[1], datetime.datetime(2015, 9, 24, 23, 59, 59, 999989), close=3600)
-    assert_bar(bars[2], datetime.datetime(2015, 9, 25, 23, 59, 59, 999989), close=3075)
-    assert_bar(bars[3], datetime.datetime(2015, 9, 26, 23, 59, 59, 999989), close=3078)
+    assert_data(strat.data, -3, datetime.datetime(2015, 9, 23, 23, 59, 59, 999989), close=3072)
+    assert_data(strat.data, -2, datetime.datetime(2015, 9, 24, 23, 59, 59, 999989), close=3600)
+    assert_data(strat.data, -1, datetime.datetime(2015, 9, 25, 23, 59, 59, 999989), close=3075)
+    assert_data(strat.data, 0, datetime.datetime(2015, 9, 26, 23, 59, 59, 999989), close=3078)
 
 
 def test_tcal_8_to_20():
     """Read tick data and resample to 1 day bars according to trading calendar."""
-    bars = _run_cerebro(use_tcal=True,
+    strat = _run_cerebro(use_tcal=True,
                         open_hour=8,
                         open_minute=0,
                         close_hour=20,
                         close_minute=0,
                         )
 
-    assert len(bars) == 3
+    assert len(strat) == 3
 
-    assert_bar(bars[0], datetime.datetime(2015, 9, 24, 20, 0, 0), close=3500)
-    assert_bar(bars[1], datetime.datetime(2015, 9, 25, 20, 0, 0), close=3074)
-    assert_bar(bars[2], datetime.datetime(2015, 9, 26, 20, 0, 0), close=3078)
+    assert_data(strat.data, -2, datetime.datetime(2015, 9, 24, 20, 0, 0), close=3500)
+    assert_data(strat.data, -1, datetime.datetime(2015, 9, 25, 20, 0, 0), close=3074)
+    assert_data(strat.data, 0, datetime.datetime(2015, 9, 26, 20, 0, 0), close=3078)
 
 
 def test_tcal_8_to_20_30(main=False):
     """Trading calenadar times are a bit longer and contain some more ticks that would be filtered otherwise."""
-    bars = _run_cerebro(use_tcal=True,
+    strat = _run_cerebro(use_tcal=True,
                         open_hour=8,
                         open_minute=0,
                         close_hour=20,
                         close_minute=30,
                         )
 
-    assert len(bars) == 3
+    assert len(strat) == 3
 
-    assert_bar(bars[0], datetime.datetime(2015, 9, 24, 20, 30, 0), close=3600)
-    assert_bar(bars[1], datetime.datetime(2015, 9, 25, 20, 30, 0), close=3074)
-    assert_bar(bars[2], datetime.datetime(2015, 9, 26, 20, 30, 0), close=3078)
+    assert_data(strat.data, -2, datetime.datetime(2015, 9, 24, 20, 30, 0), close=3600)
+    assert_data(strat.data, -1, datetime.datetime(2015, 9, 25, 20, 30, 0), close=3074)
+    assert_data(strat.data, 0, datetime.datetime(2015, 9, 26, 20, 30, 0), close=3078)
 
 
 @pytest.mark.timeout(5)
