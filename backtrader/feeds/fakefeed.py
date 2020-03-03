@@ -46,7 +46,7 @@ class FakeFeed(bt.DataBase):
         return self.p.live
 
     def _update_line(self, dt, value):
-        _logger.info(f"{self._name} - Updating line - Bar Time: {dt} - Value: {value}")
+        _logger.debug(f"{self._name} - Updating line - Bar Time: {dt} - Value: {value}")
 
         #if dt.hour == 18:
         #    dt = dt.replace(hour=17, minute=35)
@@ -112,14 +112,20 @@ class FakeFeed(bt.DataBase):
     @staticmethod
     def _time_floored(now, timeframe):
         t = now
-        if timeframe in [bt.TimeFrame.Minutes, bt.TimeFrame.Ticks]:
+        if timeframe in [bt.TimeFrame.Seconds, bt.TimeFrame.Ticks]:
+            t = t.replace(microsecond=0)
+        elif timeframe in bt.TimeFrame.Minutes:  # Ticks get also floored to last full second
             t = t.replace(second=0, microsecond=0)
         elif timeframe == bt.TimeFrame.Days:
-            t = t.replace(minute=0, second=0, microsecond=0)
+            t = t.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            raise Exception(f'TimeFrame {timeframe} not supported')
         return t
 
     def _load_live(self, now):
         tf = self.p.timeframe
+        target_tf = self._timeframe
+
         comp = self.p.compression
 
         if self._last_delivered is None:
@@ -129,6 +135,7 @@ class FakeFeed(bt.DataBase):
         if tf == bt.TimeFrame.Ticks:
             if now - self._last_delivered < self.p.tick_interval:
                 return None
+            _logger.info(f"{self._name} - Delivering - now: {now} - lastDel: {self._last_delivered}")
             self._last_delivered += self.p.tick_interval
         else:
             if tf == bt.TimeFrame.Minutes:

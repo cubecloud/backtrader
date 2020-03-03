@@ -22,20 +22,20 @@ class RecorderListener(ListenerBase):
         line = snapshot['array']
         if name == 'datetime':
             line = [bt.num2date(x) for x in line]
-        _logger.info(f"Line '{name:20}' idx: {snapshot['idx']} - lencount: {snapshot['lencount']} - {list(reversed(line))}")
+        _logger.debug(f"Line '{name:20}' idx: {snapshot['idx']} - lencount: {snapshot['lencount']} - {list(reversed(line))}")
 
     @staticmethod
     def print_next(idx, next):
-        _logger.info(f'--- Next: {next["prenext"]} - #{idx}')
+        _logger.debug(f'--- Next: {next["prenext"]} - #{idx}')
         RecorderListener.print_line_snapshot('datetime', next['strategy']['datetime'])
 
         for di, data in enumerate(next['datas']):
-            _logger.info(f'\t--- Data {di}')
+            _logger.debug(f'\t--- Data {di}')
             for k, v in data[1].items():
                 RecorderListener.print_line_snapshot(k, v)
 
         for oi, obs in enumerate(next['observers']):
-            _logger.info(f'\t--- Obvserver {oi}')
+            _logger.debug(f'\t--- Obvserver {oi}')
             for k, v in obs[1].items():
                 RecorderListener.print_line_snapshot(k, v)
 
