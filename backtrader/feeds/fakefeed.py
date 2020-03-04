@@ -85,9 +85,11 @@ class FakeFeed(bt.DataBase):
             return self._load_bar(now)
 
     def _load_bar(self, now, backfill=False):
-        tf, comp = (self.p.timeframe, self.p.compression) if not backfill else (self._timeframe, self._compression)
+        tf, comp = self._timeframe, self._compression
         if tf == bt.TimeFrame.Ticks:
             delta = self.p.tick_interval * comp
+        elif tf == bt.TimeFrame.Seconds:
+            delta = datetime.timedelta(seconds=comp)
         elif tf == bt.TimeFrame.Minutes:
             delta = datetime.timedelta(minutes=comp)
         elif tf == bt.TimeFrame.Days:
