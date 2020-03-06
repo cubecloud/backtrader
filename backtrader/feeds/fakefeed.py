@@ -33,7 +33,6 @@ class FakeFeed(bt.DataBase):
         self._current_comp = 0
         self._num_bars_delivered = 0
         self._compression_in_effect = None
-        self._backfill_curtime = None
         self._tmoffset = datetime.timedelta(seconds=-0.5)  # configure offset cause we are sending slightly delayed ticked data (of course!)
         self._start_ts = None  # time of the first call to _load to obey start_delay
 
@@ -116,13 +115,13 @@ class FakeFeed(bt.DataBase):
 
         if self._last_delivered is None:
             if backfill:
-                self._last_delivered = self._time_floored(now - delta * (self.p.num_gen_bars - 1), tf)
+                self._last_delivered = self._time_floored(now - delta * self.p.num_gen_bars, tf, comp)  # go back one bar too far since we add one instantly
             else:
                 self._last_delivered = self._time_floored(now, tf)
 
         self._last_delivered += delta
 
-        _logger.info(f"{self._name} - Loading bar: {self._backfill_curtime}")
+        _logger.info(f"{self._name} - Loading bar: {self._last_delivered}")
 
         if backfill:
             self._update_bar(self._last_delivered, self._cur_value, self._cur_value, self._cur_value + comp, self._cur_value + comp)
@@ -135,21 +134,28 @@ class FakeFeed(bt.DataBase):
         return True
 
     @staticmethod
-    def _time_floored(now, timeframe):
+    def _time_floored(now, timeframe, comp=1):
         t = now
         if timeframe in [bt.TimeFrame.Seconds, bt.TimeFrame.Ticks]:
-            t = t.replace(microsecond=0)
-        elif timeframe == bt.TimeFrame.Minutes:  # Ticks get also floored to last full second
-            t = t.replace(second=0, microsecond=0)
+            t -= datetime.timedelta(seconds=t.second % comp,
+                                    microseconds=t.microsecond)
+        elif timeframe == bt.TimeFrame.Minutes:
+            t -= datetime.timedelta(minutes=t.minute % comp,
+                                    seconds=t.second,
+                                    microseconds=t.microsecond)
         elif timeframe == bt.TimeFrame.Days:
-            t = t.replace(hour=0, minute=0, second=0, microsecond=0)
+            if comp != 1:
+                raise Exception('For timeframe days only compression of 1 is supported.')
+            t -= datetime.timedelta(hours=t.hour,
+                                    minutes=t.minute,
+                                    seconds=t.second,
+                                    microseconds=t.microsecond)
         else:
             raise Exception(f'TimeFrame {timeframe} not supported')
         return t
 
     def _load_live(self, now):
         tf = self.p.timeframe
-        target_tf = self._timeframe
 
         comp = self.p.compression
 
