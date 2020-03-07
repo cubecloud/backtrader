@@ -167,7 +167,7 @@ class LineIterator(with_metaclass(MetaLineIterator, LineSeries)):
                     plotmaster=None,
                     plotid=None,
                     plotaspectratio=None,
-                    logicgroup=None,
+                    tradingdomain=None,
                     )
 
     def _periodrecalc(self):
