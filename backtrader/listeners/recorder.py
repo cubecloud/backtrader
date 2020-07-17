@@ -39,6 +39,11 @@ class RecorderListener(ListenerBase):
             for k, v in obs[1].items():
                 RecorderListener.print_line_snapshot(k, v)
 
+        for ii, ind in enumerate(next['indicators']):
+            _logger.debug(f'\t--- Indicators {ii}')
+            for k, v in ind[1].items():
+                RecorderListener.print_line_snapshot(k, v)
+
     @staticmethod
     def print_nexts(nexts):
         for i, n in enumerate(nexts):
@@ -64,7 +69,11 @@ class RecorderListener(ListenerBase):
         for obs in strat.getobservers():
             oblines.append((obs.__class__, self._copy_lines(obs)))
 
-        self.nexts.append({'prenext': is_prenext, 'strategy': self._copy_lines(strat), 'datas': curbars, 'observers': oblines})
+        indlines = []
+        for ind in strat.getindicators():
+            indlines.append((ind.__class__, self._copy_lines(ind)))
+
+        self.nexts.append({'prenext': is_prenext, 'strategy': self._copy_lines(strat), 'datas': curbars, 'observers': oblines, 'indicators': indlines})
 
         _logger.info(f"------------------- next")
         self.print_next(len(strat), self.nexts[-1])
@@ -72,7 +81,7 @@ class RecorderListener(ListenerBase):
 
     def next(self):
         for s in self._cerebro.runningstrats:
-            minper = s._getminperstatus()
-            if minper > 0:
-                continue
+            #minper = s._getminperstatus()
+            #if minper > 0:
+            #    continue
             self._record_data(s)
